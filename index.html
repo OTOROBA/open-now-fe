@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Google Maps URLから店舗名抽出 & 開店状況入力</title>
+    <title>店舗の開店状況 ~Open Now~</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* カスタムフォント (Inter) を適用 */
@@ -14,13 +14,14 @@
         .status-button-active {
             background-color: #3730a3; /* indigo-800 */
             color: white;
+            box-shadow: 0 0 0 2px white, 0 0 0 4px #4f46e5; /* indigo-500相当のリング */
         }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
     <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
-        <h1 class="text-2xl font-bold text-center text-gray-800 mb-6">Google Maps URLから店舗名抽出 & 開店状況入力</h1>
+        <h1 class="text-2xl font-bold text-center text-gray-800 mb-6">店舗の開店状況</h1>
 
         <div class="mb-4">
             <label for="gmapsUrl" class="block text-sm font-medium text-gray-700 mb-1">Google MapsのURLを入力してください:</label>
@@ -29,157 +30,197 @@
                    placeholder="例: https://www.google.co.jp/maps/place/東京タワー/...">
         </div>
 
-        <button id="extractButton"
+        <button id="fetchStatusButton"
                 class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-4 rounded-md shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out">
-            店舗名を取得
+            状況を取得
         </button>
 
-        <div id="resultArea" class="mt-6 p-4 bg-gray-50 rounded-md min-h-[60px] flex items-center justify-center">
-            <p id="storeName" class="text-gray-700 text-center">ここに店舗名が表示されます。</p>
+        <div id="resultArea" class="mt-6 p-4 bg-gray-50 rounded-md min-h-[80px] flex flex-col items-center justify-center">
+            <p id="storeNameDisplay" class="text-gray-700 text-center text-lg font-semibold">店舗情報がここに表示されます。</p>
+            <div id="statusSummaryArea" class="mt-2 text-sm text-gray-600 text-center">
+                </div>
         </div>
 
-        <div id="statusInputSection" class="mt-6 border-t pt-6 hidden">
-            <h2 class="text-lg font-semibold text-gray-700 mb-3 text-center">現在の開店状況を選択してください:</h2>
+        <div id="userInputSection" class="mt-6 border-t pt-6 hidden">
+            <h2 class="text-lg font-semibold text-gray-700 mb-3 text-center">現在の開店状況を投稿:</h2>
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <button id="statusOpen" data-status="開店中"
-                        class="status-button bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded-md shadow-sm transition duration-150 ease-in-out">
+                <button data-status-value="open" data-status-text="開店中"
+                        class="status-post-button bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded-md shadow-sm transition duration-150 ease-in-out">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-1" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
                     </svg>
                     開店中
                 </button>
-                <button id="statusPreparing" data-status="準備中"
-                        class="status-button bg-yellow-500 hover:bg-yellow-600 text-white font-medium py-2 px-4 rounded-md shadow-sm transition duration-150 ease-in-out">
+                <button data-status-value="preparing" data-status-text="準備中"
+                        class="status-post-button bg-yellow-500 hover:bg-yellow-600 text-white font-medium py-2 px-4 rounded-md shadow-sm transition duration-150 ease-in-out">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-1" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.414-1.415L11 9.586V6z" clip-rule="evenodd" />
                     </svg>
                     準備中
                 </button>
-                <button id="statusClosed" data-status="閉店中"
-                        class="status-button bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-md shadow-sm transition duration-150 ease-in-out">
+                <button data-status-value="closed" data-status-text="閉店中"
+                        class="status-post-button bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-md shadow-sm transition duration-150 ease-in-out">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-1" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
                     </svg>
                     閉店中
                 </button>
             </div>
-            <div id="selectedStatusArea" class="mt-4 p-3 bg-gray-50 rounded-md min-h-[50px] flex items-center justify-center">
-                <p id="currentStatusDisplay" class="text-gray-700 text-center">状況を選択してください。</p>
+            <div id="postStatusResultArea" class="mt-4 p-3 bg-gray-50 rounded-md min-h-[50px] flex items-center justify-center">
+                <p id="postStatusResult" class="text-gray-700 text-center">状況を選択して投稿してください。</p>
             </div>
         </div>
 
         <p class="text-xs text-gray-500 mt-8 text-center">
-            ※ このツールはURLのパターンから店舗名を推定します。全てのURL形式に対応しているわけではありません。
+            ※ URLから店舗情報を取得し、過去1時間の投稿状況を集計します。
         </p>
     </div>
 
     <script>
-        // HTML要素を取得
+        // --- 設定値 (重要: ご自身のSupabaseプロジェクトの値に置き換えてください) ---
+        const GET_STATUS_FUNCTION_URL = 'https://puzyubxzxeuucdgnuihg.supabase.co/functions/v1/select-store-status';
+        const POST_STATUS_FUNCTION_URL = 'https://puzyubxzxeuucdgnuihg.supabase.co/functions/v1/insert-store-status'; 
+        
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB1enl1Ynh6eGV1dWNkZ251aWhnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY5NjUwMjQsImV4cCI6MjA2MjU0MTAyNH0.MyY2f3gQ7MNl2lFvlrs1nIMebBs1hFdqEJGu6CGLr3Q';
+
         const urlInput = document.getElementById('gmapsUrl');
-        const extractButton = document.getElementById('extractButton');
-        const storeNameDisplay = document.getElementById('storeName');
+        const fetchStatusButton = document.getElementById('fetchStatusButton');
+        const storeNameDisplay = document.getElementById('storeNameDisplay');
+        const statusSummaryArea = document.getElementById('statusSummaryArea');
         const resultArea = document.getElementById('resultArea');
+        const userInputSection = document.getElementById('userInputSection');
+        const postStatusButtons = document.querySelectorAll('.status-post-button');
+        const postStatusResult = document.getElementById('postStatusResult');
+        const postStatusResultArea = document.getElementById('postStatusResultArea');
+        let currentCid = null;
 
-        const statusInputSection = document.getElementById('statusInputSection');
-        const statusButtons = document.querySelectorAll('.status-button'); // 全ての状況ボタン
-        const currentStatusDisplay = document.getElementById('currentStatusDisplay');
-        const selectedStatusArea = document.getElementById('selectedStatusArea');
-
-        // Google Mapsの短縮URLとして知られるホスト名
-        const shortUrlHosts = ['goo.gl', 'maps.app.goo.gl', 'googleusercontent.com']; // googleusercontent.com は範囲が広すぎる可能性あり、より具体的に
-
-        // 「店舗名を取得」ボタンがクリックされたときの処理
-        extractButton.addEventListener('click', () => {
+        fetchStatusButton.addEventListener('click', async () => {
             const urlString = urlInput.value.trim();
             storeNameDisplay.textContent = '処理中...';
+            statusSummaryArea.innerHTML = '';
             resultArea.classList.remove('bg-red-100', 'bg-green-100', 'bg-yellow-100');
             resultArea.classList.add('bg-gray-50');
-
-            // 開店状況入力セクションを初期化・非表示
-            statusInputSection.classList.add('hidden');
-            currentStatusDisplay.textContent = '状況を選択してください。';
-            selectedStatusArea.classList.remove('bg-red-100', 'bg-green-100', 'bg-yellow-100', 'bg-blue-100');
-            selectedStatusArea.classList.add('bg-gray-50');
-            statusButtons.forEach(btn => btn.classList.remove('status-button-active'));
-
+            userInputSection.classList.add('hidden');
+            postStatusResult.textContent = '状況を選択して投稿してください。';
+            postStatusResultArea.className = 'mt-4 p-3 bg-gray-50 rounded-md min-h-[50px] flex items-center justify-center';
+            currentCid = null;
+            postStatusButtons.forEach(btn => btn.classList.remove('status-button-active'));
 
             if (!urlString) {
-                storeNameDisplay.textContent = 'URLが入力されていません。';
+                storeNameDisplay.textContent = 'Google MapsのURLが入力されていません。';
                 resultArea.classList.add('bg-red-100');
                 return;
             }
 
             try {
-                const url = new URL(urlString);
+                storeNameDisplay.textContent = '店舗情報を取得中...';
+                const response = await fetch(GET_STATUS_FUNCTION_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'Content-Type': 'application/json',
+                        'apikey': SUPABASE_ANON_KEY,
+                    },
+                    body: JSON.stringify({ q: urlString })
+                });
 
-                if (shortUrlHosts.some(host => url.hostname.includes(host))) {
-                    storeNameDisplay.textContent = '短縮URLのようです。お手数ですが、一度ブラウザで開いて表示された完全なURLをコピーして入力してください。';
-                    resultArea.classList.add('bg-yellow-100');
-                    return;
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ 
+                        error: `HTTPエラー: ${response.status} ${response.statusText || '(ステータステキストなし)'}` 
+                    }));
+                    throw new Error(errorData.error || `APIリクエストに失敗しました。ステータス: ${response.status}`);
                 }
-
-                const extractedName = parseStoreNameFromFullUrl(urlString, url);
-
-                if (extractedName) {
-                    storeNameDisplay.textContent = `抽出された店舗名: ${extractedName}`;
+                const result = await response.json();
+                if (result.success && result.data) {
+                    storeNameDisplay.textContent = result.data.storeName || '店舗名不明';
+                    currentCid = result.data.cid;
+                    resultArea.classList.remove('bg-red-100', 'bg-yellow-100');
                     resultArea.classList.add('bg-green-100');
-                    statusInputSection.classList.remove('hidden'); // 開店状況入力セクションを表示
+                    let summaryHtml = `<strong>CID:</strong> ${result.data.cid}<br>`;
+                    summaryHtml += `<strong>開店中:</strong> ${result.data.open}件<br>`;
+                    summaryHtml += `<strong>準備中:</strong> ${result.data.preparing}件<br>`;
+                    summaryHtml += `<strong>閉店中:</strong> ${result.data.closed}件<br>`;
+                    summaryHtml += `(過去1時間の投稿総数: ${result.data.last_hour_entries}件)`;
+                    statusSummaryArea.innerHTML = summaryHtml;
+                    if (currentCid) {
+                        userInputSection.classList.remove('hidden');
+                        userInputSection.dataset.cid = currentCid;
+                    }
                 } else {
-                    storeNameDisplay.textContent = '店舗名を抽出できませんでした。URLの形式を確認してください。 (例: /maps/place/店舗名/...)';
-                    resultArea.classList.add('bg-red-100');
+                    throw new Error(result.error || 'APIから有効なデータが返されませんでした。');
                 }
             } catch (error) {
-                console.error("エラーが発生しました:", error);
-                storeNameDisplay.textContent = 'URLの解析中にエラーが発生しました。正しいURLか確認してください。';
+                console.error("API呼び出しエラー (詳細):", error);
+                let displayErrorMessage = '不明なエラーが発生しました。';
+                if (error instanceof Error) { displayErrorMessage = error.message || 'エラーメッセージがありません。'; }
+                 if (!displayErrorMessage || displayErrorMessage.trim() === '' || displayErrorMessage === '{}') {
+                    displayErrorMessage = 'エラーが発生しました。詳細はブラウザのコンソールを確認してください。';
+                }
+                storeNameDisplay.textContent = '情報の取得に失敗しました。';
+                statusSummaryArea.innerHTML = `<span class="text-red-600">${displayErrorMessage}</span>`;
+                resultArea.classList.remove('bg-green-100', 'bg-yellow-100');
                 resultArea.classList.add('bg-red-100');
             }
         });
 
-        /**
-         * Google Mapsの完全なURLから店舗名らしき部分を抽出する関数
-         * @param {string} urlString - Google MapsのURL文字列
-         * @param {URL} urlObject - new URL(urlString) で生成されたURLオブジェクト
-         * @returns {string|null} - 抽出された店舗名、または見つからない場合はnull
-         */
-        function parseStoreNameFromFullUrl(urlString, urlObject) {
-            if (!urlObject.hostname.includes('google.')) {
-                return null;
-            }
-            const pathSegments = urlObject.pathname.split('/');
-            const placeIndex = pathSegments.indexOf('place');
-            if (placeIndex !== -1 && pathSegments.length > placeIndex + 1) {
-                const potentialName = pathSegments[placeIndex + 1];
-                if (potentialName && !potentialName.startsWith('@')) {
-                    return decodeURIComponent(potentialName.replace(/\+/g, ' '));
+        postStatusButtons.forEach(button => {
+            button.addEventListener('click', async () => {
+                const selectedStatusValue = button.dataset.statusValue;
+                const selectedStatusText = button.dataset.statusText;
+                const cidForPost = userInputSection.dataset.cid; 
+                const originalUrl = urlInput.value.trim(); 
+
+                if (!cidForPost) {
+                    postStatusResult.textContent = "店舗が特定されていません。まずURLを入力して状況を取得してください。";
+                    postStatusResultArea.className = 'mt-4 p-3 bg-red-100 text-red-700 rounded-md min-h-[50px] flex items-center justify-center';
+                    return;
                 }
-            }
-            return null;
-        }
 
-        // 開店状況ボタンの処理
-        statusButtons.forEach(button => {
-            button.addEventListener('click', () => {
-                const selectedStatus = button.dataset.status; // data-status属性から値を取得
-                currentStatusDisplay.textContent = `現在の状況: ${selectedStatus}`;
+                postStatusResult.textContent = "投稿処理中...";
+                postStatusResultArea.className = 'mt-4 p-3 bg-blue-100 text-blue-700 rounded-md min-h-[50px] flex items-center justify-center';
 
-                // 選択されたボタンのスタイル変更 (任意)
-                statusButtons.forEach(btn => btn.classList.remove('status-button-active', 'ring-2', 'ring-offset-2', 'ring-indigo-400'));
-                button.classList.add('status-button-active', 'ring-2', 'ring-offset-2', 'ring-indigo-400');
+                try {
+                    const response = await fetch(POST_STATUS_FUNCTION_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                            'Content-Type': 'application/json',
+                            'apikey': SUPABASE_ANON_KEY,
+                        },
+                        body: JSON.stringify({
+                            q: originalUrl,
+                            status: selectedStatusValue
+                        })
+                    });
 
-                // 表示エリアの背景色変更
-                selectedStatusArea.classList.remove('bg-red-100', 'bg-green-100', 'bg-yellow-100', 'bg-blue-100', 'bg-gray-50');
-                if (selectedStatus === "開店中") {
-                    selectedStatusArea.classList.add('bg-green-100');
-                } else if (selectedStatus === "準備中") {
-                    selectedStatusArea.classList.add('bg-yellow-100');
-                } else if (selectedStatus === "閉店中") {
-                    selectedStatusArea.classList.add('bg-red-100');
-                } else {
-                    selectedStatusArea.classList.add('bg-blue-100'); // その他の場合
+                    // HTTPステータスコードで成否を判断
+                    if (response.ok) { 
+                        // ★★★ 修正点: response.json() を使わず、選択されたステータスで成功メッセージを作成 ★★★
+                        const successMessage = `「${selectedStatusText}」として投稿しました。`;
+                        // console.log("投稿APIからのレスポンス (ステータスOK):", response.status, response.statusText);
+                        
+                        postStatusResult.textContent = successMessage;
+                        postStatusResultArea.className = 'mt-4 p-3 bg-green-100 text-green-700 rounded-md min-h-[50px] flex items-center justify-center';
+                        
+                        postStatusButtons.forEach(btn => btn.classList.remove('status-button-active'));
+                        button.classList.add('status-button-active');
+
+                        // fetchStatusButton.click(); // 投稿成功後、集計情報を再取得
+                    } else {
+                        // HTTPステータスコードがエラー範囲の場合
+                        const errorData = await response.json().catch(() => ({
+                             error: `HTTPエラー: ${response.status} ${response.statusText || '(レスポンスボディなし、またはJSONではありません)'}`
+                        }));
+                        throw new Error(errorData.error || `投稿APIリクエスト失敗: ${response.status}`);
+                    }
+
+                } catch (error) {
+                    console.error("状況投稿エラー (詳細):", error);
+                    postStatusResult.textContent = `投稿に失敗しました: ${error.message || '不明なエラー'}`;
+                    postStatusResultArea.className = 'mt-4 p-3 bg-red-100 text-red-700 rounded-md min-h-[50px] flex items-center justify-center';
                 }
             });
         });
-
     </script>
 </body>
 </html>
