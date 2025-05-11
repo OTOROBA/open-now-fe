@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Maps URLから店舗名抽出 & 開店状況入力</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* カスタムフォント (Inter) を適用 */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* ボタンがアクティブな時のスタイル（任意） */
+        .status-button-active {
+            background-color: #3730a3; /* indigo-800 */
+            color: white;
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+    <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+        <h1 class="text-2xl font-bold text-center text-gray-800 mb-6">Google Maps URLから店舗名抽出 & 開店状況入力</h1>
+
+        <div class="mb-4">
+            <label for="gmapsUrl" class="block text-sm font-medium text-gray-700 mb-1">Google MapsのURLを入力してください:</label>
+            <input type="url" id="gmapsUrl" name="gmapsUrl"
+                   class="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                   placeholder="例: https://www.google.co.jp/maps/place/東京タワー/...">
+        </div>
+
+        <button id="extractButton"
+                class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-4 rounded-md shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out">
+            店舗名を取得
+        </button>
+
+        <div id="resultArea" class="mt-6 p-4 bg-gray-50 rounded-md min-h-[60px] flex items-center justify-center">
+            <p id="storeName" class="text-gray-700 text-center">ここに店舗名が表示されます。</p>
+        </div>
+
+        <div id="statusInputSection" class="mt-6 border-t pt-6 hidden">
+            <h2 class="text-lg font-semibold text-gray-700 mb-3 text-center">現在の開店状況を選択してください:</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <button id="statusOpen" data-status="開店中"
+                        class="status-button bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded-md shadow-sm transition duration-150 ease-in-out">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-1" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                    </svg>
+                    開店中
+                </button>
+                <button id="statusPreparing" data-status="準備中"
+                        class="status-button bg-yellow-500 hover:bg-yellow-600 text-white font-medium py-2 px-4 rounded-md shadow-sm transition duration-150 ease-in-out">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-1" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.414-1.415L11 9.586V6z" clip-rule="evenodd" />
+                    </svg>
+                    準備中
+                </button>
+                <button id="statusClosed" data-status="閉店中"
+                        class="status-button bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-md shadow-sm transition duration-150 ease-in-out">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-1" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                    </svg>
+                    閉店中
+                </button>
+            </div>
+            <div id="selectedStatusArea" class="mt-4 p-3 bg-gray-50 rounded-md min-h-[50px] flex items-center justify-center">
+                <p id="currentStatusDisplay" class="text-gray-700 text-center">状況を選択してください。</p>
+            </div>
+        </div>
+
+        <p class="text-xs text-gray-500 mt-8 text-center">
+            ※ このツールはURLのパターンから店舗名を推定します。全てのURL形式に対応しているわけではありません。
+        </p>
+    </div>
+
+    <script>
+        // HTML要素を取得
+        const urlInput = document.getElementById('gmapsUrl');
+        const extractButton = document.getElementById('extractButton');
+        const storeNameDisplay = document.getElementById('storeName');
+        const resultArea = document.getElementById('resultArea');
+
+        const statusInputSection = document.getElementById('statusInputSection');
+        const statusButtons = document.querySelectorAll('.status-button'); // 全ての状況ボタン
+        const currentStatusDisplay = document.getElementById('currentStatusDisplay');
+        const selectedStatusArea = document.getElementById('selectedStatusArea');
+
+        // Google Mapsの短縮URLとして知られるホスト名
+        const shortUrlHosts = ['goo.gl', 'maps.app.goo.gl', 'googleusercontent.com']; // googleusercontent.com は範囲が広すぎる可能性あり、より具体的に
+
+        // 「店舗名を取得」ボタンがクリックされたときの処理
+        extractButton.addEventListener('click', () => {
+            const urlString = urlInput.value.trim();
+            storeNameDisplay.textContent = '処理中...';
+            resultArea.classList.remove('bg-red-100', 'bg-green-100', 'bg-yellow-100');
+            resultArea.classList.add('bg-gray-50');
+
+            // 開店状況入力セクションを初期化・非表示
+            statusInputSection.classList.add('hidden');
+            currentStatusDisplay.textContent = '状況を選択してください。';
+            selectedStatusArea.classList.remove('bg-red-100', 'bg-green-100', 'bg-yellow-100', 'bg-blue-100');
+            selectedStatusArea.classList.add('bg-gray-50');
+            statusButtons.forEach(btn => btn.classList.remove('status-button-active'));
+
+
+            if (!urlString) {
+                storeNameDisplay.textContent = 'URLが入力されていません。';
+                resultArea.classList.add('bg-red-100');
+                return;
+            }
+
+            try {
+                const url = new URL(urlString);
+
+                if (shortUrlHosts.some(host => url.hostname.includes(host))) {
+                    storeNameDisplay.textContent = '短縮URLのようです。お手数ですが、一度ブラウザで開いて表示された完全なURLをコピーして入力してください。';
+                    resultArea.classList.add('bg-yellow-100');
+                    return;
+                }
+
+                const extractedName = parseStoreNameFromFullUrl(urlString, url);
+
+                if (extractedName) {
+                    storeNameDisplay.textContent = `抽出された店舗名: ${extractedName}`;
+                    resultArea.classList.add('bg-green-100');
+                    statusInputSection.classList.remove('hidden'); // 開店状況入力セクションを表示
+                } else {
+                    storeNameDisplay.textContent = '店舗名を抽出できませんでした。URLの形式を確認してください。 (例: /maps/place/店舗名/...)';
+                    resultArea.classList.add('bg-red-100');
+                }
+            } catch (error) {
+                console.error("エラーが発生しました:", error);
+                storeNameDisplay.textContent = 'URLの解析中にエラーが発生しました。正しいURLか確認してください。';
+                resultArea.classList.add('bg-red-100');
+            }
+        });
+
+        /**
+         * Google Mapsの完全なURLから店舗名らしき部分を抽出する関数
+         * @param {string} urlString - Google MapsのURL文字列
+         * @param {URL} urlObject - new URL(urlString) で生成されたURLオブジェクト
+         * @returns {string|null} - 抽出された店舗名、または見つからない場合はnull
+         */
+        function parseStoreNameFromFullUrl(urlString, urlObject) {
+            if (!urlObject.hostname.includes('google.')) {
+                return null;
+            }
+            const pathSegments = urlObject.pathname.split('/');
+            const placeIndex = pathSegments.indexOf('place');
+            if (placeIndex !== -1 && pathSegments.length > placeIndex + 1) {
+                const potentialName = pathSegments[placeIndex + 1];
+                if (potentialName && !potentialName.startsWith('@')) {
+                    return decodeURIComponent(potentialName.replace(/\+/g, ' '));
+                }
+            }
+            return null;
+        }
+
+        // 開店状況ボタンの処理
+        statusButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const selectedStatus = button.dataset.status; // data-status属性から値を取得
+                currentStatusDisplay.textContent = `現在の状況: ${selectedStatus}`;
+
+                // 選択されたボタンのスタイル変更 (任意)
+                statusButtons.forEach(btn => btn.classList.remove('status-button-active', 'ring-2', 'ring-offset-2', 'ring-indigo-400'));
+                button.classList.add('status-button-active', 'ring-2', 'ring-offset-2', 'ring-indigo-400');
+
+                // 表示エリアの背景色変更
+                selectedStatusArea.classList.remove('bg-red-100', 'bg-green-100', 'bg-yellow-100', 'bg-blue-100', 'bg-gray-50');
+                if (selectedStatus === "開店中") {
+                    selectedStatusArea.classList.add('bg-green-100');
+                } else if (selectedStatus === "準備中") {
+                    selectedStatusArea.classList.add('bg-yellow-100');
+                } else if (selectedStatus === "閉店中") {
+                    selectedStatusArea.classList.add('bg-red-100');
+                } else {
+                    selectedStatusArea.classList.add('bg-blue-100'); // その他の場合
+                }
+            });
+        });
+
+    </script>
+</body>
+</html>
