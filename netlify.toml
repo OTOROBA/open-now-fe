@@ -1,0 +1,6 @@
+[[redirects]]
+  from = "/"
+  to = "/open-now"
+  status = 301 # 恒久的な移動の場合 (SEOに推奨)
+  # status = 302 # 一時的な移動の場合
+  force = true # ルートにファイルがあっても強制的にリダイレクトする場合
